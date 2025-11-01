@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modellatore Interattivo del Terreno</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .subtitle {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 180px);
+            padding: 15px;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .top-section {
+            display: flex;
+            gap: 15px;
+            flex: 1 1 auto;
+            min-height: 400px;
+        }
+
+        .left-controls {
+            flex: 0 0 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .instructions-container {
+            background: #0f3460;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .instructions-header {
+            background: #667eea;
+            padding: 12px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .instructions-header:hover {
+            background: #5568d3;
+        }
+
+        .instructions-header h2 {
+            font-size: 1.2em;
+            margin: 0;
+        }
+
+        .toggle-icon {
+            font-size: 1.5em;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .instructions-content {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 15px 20px;
+            transition: max-height 0.3s ease;
+        }
+
+        .instructions-content.collapsed {
+            max-height: 0;
+            padding: 0 20px;
+            overflow: hidden;
+        }
+
+        .instructions-content ol {
+            margin-left: 20px;
+            line-height: 1.6;
+        }
+
+        .instructions-content li {
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+
+        .instructions-content strong {
+            color: #ffd700;
+        }
+
+        .instructions-content ul {
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 15px;
+            background: #0f3460;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            align-items: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #addPointBtn {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+
+        #addPointBtn.active {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            animation: pulse 1.5s infinite;
+        }
+
+        #confirmPointBtn {
+            background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+            color: white;
+        }
+
+        #traceProfileBtn {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            color: white;
+        }
+
+        #traceProfileBtn.active {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            animation: pulse 1.5s infinite;
+        }
+
+        #mapViewBtn {
+            background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+            color: white;
+        }
+
+        #mapViewBtn.active {
+            background: linear-gradient(135deg, #E91E63, #C2185B);
+            animation: pulse 1.5s infinite;
+        }
+
+        #resetBtn {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .canvas-container {
+            flex: 1;
+            background: #16213e;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+        }
+
+        .canvas-container.grab-cursor {
+            cursor: grab;
+        }
+
+        .canvas-container.grabbing-cursor {
+            cursor: grabbing;
+        }
+
+        #terrain-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .section-container {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            flex: 0 0 auto;
+        }
+
+        .section-header {
+            color: #4CAF50;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            text-align: center;
+        }
+
+        #section-canvas {
+            flex: 1;
+            background: #1a1a2e;
+            border-radius: 5px;
+        }
+
+        .section-placeholder {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .point-counter {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.85);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 100;
+            border: 2px solid #4CAF50;
+        }
+
+        .compass {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            width: 100px;
+            height: 100px;
+            z-index: 100;
+            transition: transform 0.1s ease-out;
+        }
+
+        .legend {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.85);
+            padding: 12px;
+            border-radius: 8px;
+            z-index: 100;
+            border: 2px solid #667eea;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .legend-line {
+            width: 25px;
+            margin-right: 8px;
+        }
+
+        .status-message {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        /* Scrollbar personalizzata */
+        .instructions-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .instructions-content::-webkit-scrollbar-track {
+            background: #1a1a2e;
+            border-radius: 10px;
+        }
+
+        .instructions-content::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+
+        .instructions-content::-webkit-scrollbar-thumb:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏔️ Modellatore Interattivo del Terreno 🏔️</h1>
+        <div class="subtitle">Un'attività per la Classe 3A del Plesso Carducci di Gaggio</div>
+    </div>
+
+    <div class="main-container">
+        <!-- SEZIONE SUPERIORE -->
+        <div class="top-section">
+            <!-- COLONNA SINISTRA: Istruzioni e Controlli -->
+            <div class="left-controls">
+                <!-- Istruzioni Collassabili -->
+                <div class="instructions-container">
+                    <div class="instructions-header" onclick="toggleInstructions()">
+                        <h2>📚 Istruzioni</h2>
+                        <span class="toggle-icon" id="toggleIcon">▼</span>
+                    </div>
+                    <div class="instructions-content" id="instructionsContent">
+                        <ol>
+                            <li><strong>Aggiungi Punto:</strong> Clicca "Aggiungi Punto" (verde), poi clicca sul terreno. Max 5 punti. <strong>Trascina la sfera SU o GIÙ</strong> per alzare/abbassare il terreno (da -200m a +200m). Il cursore diventa una manina! Poi clicca "Conferma Punto" (viola).</li>
+                            <li><strong>Le Isoipse (linee colorate):</strong>
+                                <ul>
+                                    <li>🟡 <strong>Gialle</strong> = ±25, ±75, ±125, ±175</li>
+                                    <li>🔴 <strong>Rosse</strong> = ±50, ±150</li>
+                                    <li>🔵 <strong>Blu</strong> = ±100, ±200</li>
+                                    <li>⚪ <strong>Bianca</strong> = 0 (livello del mare)</li>
+                                </ul>
+                            </li>
+                            <li><strong>Ruota Vista:</strong> Quando NON modifichi punti, clicca e trascina per ruotare. Rotellina per zoom.</li>
+                            <li><strong>Vedi Mappa:</strong> Clicca "Vedi Mappa" (viola) per vedere il terreno dall'alto in pianta con tutte le isoipse! Riclicca per tornare alla vista 3D.</li>
+                            <li><strong>Traccia Profilo:</strong> Clicca "Traccia Profilo" (blu), poi clicca e trascina per disegnare una linea. Vedrai il <strong>piano secante rosso</strong> e SOTTO comparirà il profilo topografico!</li>
+                            <li><strong>Nella Sezione (sotto):</strong> Isoipse orizzontali e punti che intersecano!</li>
+                            <li><strong>Altro Profilo:</strong> Riclicca "Traccia Profilo" per cancellare e tracciarne un altro.</li>
+                            <li><strong>Punti Cardinali:</strong> Bussola in basso a sinistra (N, S, E, O).</li>
+                            <li><strong>Reset:</strong> Clicca "Reset" (rosso) per ricominciare!</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- Controlli -->
+                <div class="controls">
+                    <button id="addPointBtn" title="Aggiungi un punto sul terreno">
+                        ➕ Aggiungi Punto
+                    </button>
+                    <button id="confirmPointBtn" style="display:none;" title="Conferma il punto modificato">
+                        ✓ Conferma Punto
+                    </button>
+                    <button id="mapViewBtn" title="Visualizza il terreno in pianta dall'alto">
+                        🗺️ Vedi Mappa
+                    </button>
+                    <button id="traceProfileBtn" title="Traccia un profilo topografico">
+                        📏 Traccia Profilo
+                    </button>
+                    <button id="resetBtn" title="Ricomincia da capo">
+                        🔄 Reset
+                    </button>
+                    <div class="status-message" id="statusMessage">Clicca "Aggiungi Punto" per iniziare!</div>
+                </div>
+            </div>
+
+            <!-- COLONNA DESTRA: Canvas 3D -->
+            <div class="canvas-wrapper">
+                <div class="canvas-container" id="canvasContainer">
+                    <div class="point-counter" id="pointCounter">Punti: 0/5</div>
+                    <div class="legend">
+                        <div style="font-weight: bold; margin-bottom: 8px; color: #4CAF50;">Legenda:</div>
+                        <div class="legend-item">
+                            <div class="legend-line" style="background: #ffeb3b; height: 2px;"></div>
+                            <span>±25, ±75, ±125, ±175</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-line" style="background: #f44336; height: 3px;"></div>
+                            <span>±50, ±150</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-line" style="background: #2196F3; height: 4px;"></div>
+                            <span>±100, ±200</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-line" style="background: #FFFFFF; height: 3px;"></div>
+                            <span>0 (livello del mare)</span>
+                        </div>
+                    </div>
+                    <svg class="compass" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="rgba(0,0,0,0.8)" stroke="#4CAF50" stroke-width="2"/>
+                        <line x1="50" y1="12" x2="50" y2="28" stroke="#f44336" stroke-width="3"/>
+                        <polygon points="50,8 46,20 54,20" fill="#f44336"/>
+                        <text x="50" y="10" text-anchor="middle" fill="white" font-size="16" font-weight="bold">N</text>
+                        <line x1="50" y1="72" x2="50" y2="88" stroke="#999" stroke-width="2"/>
+                        <text x="50" y="96" text-anchor="middle" fill="white" font-size="14">S</text>
+                        <line x1="72" y1="50" x2="88" y2="50" stroke="#999" stroke-width="2"/>
+                        <text x="94" y="53" text-anchor="middle" fill="white" font-size="14">E</text>
+                        <line x1="12" y1="50" x2="28" y2="50" stroke="#999" stroke-width="2"/>
+                        <text x="6" y="53" text-anchor="middle" fill="white" font-size="14">O</text>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEZIONE INFERIORE: Profilo Topografico -->
+        <div class="section-container">
+            <div class="section-header">📊 Profilo Topografico (appare quando tracci una linea)</div>
+            <canvas id="section-canvas"></canvas>
+            <div class="section-placeholder" id="sectionPlaceholder">
+                Traccia un profilo per visualizzare la sezione qui ↑
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ============= FUNZIONI UI =============
+        function toggleInstructions() {
+            const content = document.getElementById('instructionsContent');
+            const icon = document.getElementById('toggleIcon');
+            content.classList.toggle('collapsed');
+            icon.classList.toggle('collapsed');
+        }
+
+        // ============= CONFIGURAZIONE =============
+        const MAX_POINTS = 5;
+        const TERRAIN_SIZE = 400;
+        const GRID_RESOLUTION = 50;
+        const MAX_HEIGHT = 200;
+        const MIN_HEIGHT = -200;
+
+        // ============= VARIABILI GLOBALI =============
+        let scene, camera, renderer;
+        let terrainMesh, gridHelper;
+        let userPoints = [];
+        let isAddingPoint = false;
+        let isEditingPoint = false;
+        let isTracingProfile = false;
+        let profileLine = null;
+        let profilePlane = null;
+        let selectedPoint = null;
+        let isDragging = false;
+        let contourLines = [];
+        let contourLabels = [];
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let canRotate = true;
+        let profileStartPoint = null;
+        let isMapView = false;
+        let savedCameraPosition = new THREE.Vector3();
+        let savedCameraTarget = new THREE.Vector3();
+
+        // ============= INIZIALIZZAZIONE =============
+        init();
+        animate();
+
+        function init() {
+            const container = document.getElementById('canvasContainer');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+
+            camera = new THREE.PerspectiveCamera(
+                60,
+                container.clientWidth / container.clientHeight,
+                0.1,
+                2000
+            );
+            camera.position.set(300, 300, 300);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(100, 200, 100);
+            scene.add(directionalLight);
+
+            gridHelper = new THREE.GridHelper(TERRAIN_SIZE, 20, 0x444444, 0x222222);
+            scene.add(gridHelper);
+
+            createTerrain();
+            setupControls();
+            setupEvents();
+            setupSectionCanvas();
+
+            window.addEventListener('resize', onWindowResize);
+            
+            // Inizializza la bussola con l'orientamento corretto
+            updateCompass();
+        }
+
+        function createTerrain() {
+            const geometry = new THREE.PlaneGeometry(
+                TERRAIN_SIZE,
+                TERRAIN_SIZE,
+                GRID_RESOLUTION - 1,
+                GRID_RESOLUTION - 1
+            );
+            geometry.rotateX(-Math.PI / 2);
+
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x3a7ca5,
+                side: THREE.DoubleSide,
+                flatShading: false,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            if (terrainMesh) {
+                scene.remove(terrainMesh);
+            }
+
+            terrainMesh = new THREE.Mesh(geometry, material);
+            scene.add(terrainMesh);
+        }
+
+        function setupControls() {
+            const canvas = renderer.domElement;
+            const container = document.getElementById('canvasContainer');
+            let isRotating = false;
+            let previousMousePosition = { x: 0, y: 0 };
+
+            canvas.addEventListener('mousedown', (e) => {
+                if (e.button === 0 && canRotate && !isAddingPoint && !isTracingProfile && !isEditingPoint) {
+                    isRotating = true;
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                }
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (isRotating && canRotate) {
+                    const deltaX = e.clientX - previousMousePosition.x;
+                    const deltaY = e.clientY - previousMousePosition.y;
+
+                    const rotationSpeed = 0.005;
+                    
+                    const radius = camera.position.length();
+                    const theta = Math.atan2(camera.position.x, camera.position.z);
+                    const phi = Math.acos(camera.position.y / radius);
+
+                    const newTheta = theta - deltaX * rotationSpeed;
+                    const newPhi = Math.max(0.1, Math.min(Math.PI - 0.1, phi - deltaY * rotationSpeed));
+
+                    camera.position.x = radius * Math.sin(newPhi) * Math.sin(newTheta);
+                    camera.position.y = radius * Math.cos(newPhi);
+                    camera.position.z = radius * Math.sin(newPhi) * Math.cos(newTheta);
+                    camera.lookAt(0, 0, 0);
+
+                    updateCompass();
+
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                }
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isRotating = false;
+            });
+
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const zoomSpeed = 0.1;
+                const direction = e.deltaY > 0 ? 1 : -1;
+                const distance = camera.position.length();
+                const newDistance = Math.max(150, Math.min(800, distance + direction * distance * zoomSpeed));
+                
+                camera.position.multiplyScalar(newDistance / distance);
+                updateCompass();
+            });
+        }
+
+        function updateCompass() {
+            // Calcola l'angolo di rotazione della camera rispetto al nord (asse Z positivo)
+            const cameraDirection = new THREE.Vector3(camera.position.x, 0, camera.position.z);
+            cameraDirection.normalize();
+            
+            // L'angolo rispetto al nord (asse Z positivo)
+            // atan2 restituisce angolo in radianti, convertiamo in gradi
+            const angleRad = Math.atan2(cameraDirection.x, cameraDirection.z);
+            const angleDeg = angleRad * (180 / Math.PI);
+            
+            // Ruota la bussola (INVERTITO: ora gira nella direzione corretta)
+            const compass = document.querySelector('.compass');
+            if (compass) {
+                compass.style.transform = `rotate(${angleDeg}deg)`;
+            }
+        }
+
+        function setupEvents() {
+            const canvas = renderer.domElement;
+            const container = document.getElementById('canvasContainer');
+
+            // Aggiungi punto
+            document.getElementById('addPointBtn').addEventListener('click', () => {
+                if (userPoints.length < MAX_POINTS) {
+                    isAddingPoint = !isAddingPoint;
+                    const btn = document.getElementById('addPointBtn');
+                    if (isAddingPoint) {
+                        btn.classList.add('active');
+                        canRotate = false;
+                        updateStatus('Clicca sul terreno per aggiungere un punto!');
+                    } else {
+                        btn.classList.remove('active');
+                        canRotate = true;
+                        updateStatus('Modalità aggiunta punto disattivata');
+                    }
+                } else {
+                    updateStatus('Hai raggiunto il massimo di 5 punti!');
+                }
+            });
+
+            // Conferma punto
+            document.getElementById('confirmPointBtn').addEventListener('click', () => {
+                if (selectedPoint) {
+                    selectedPoint = null;
+                    isEditingPoint = false;
+                    canRotate = true;
+                    document.getElementById('confirmPointBtn').style.display = 'none';
+                    container.classList.remove('grab-cursor', 'grabbing-cursor');
+                    updateStatus('Punto confermato! Aggiungi altri punti o traccia il profilo.');
+                }
+            });
+
+            // Traccia profilo
+            document.getElementById('traceProfileBtn').addEventListener('click', () => {
+                if (userPoints.length === 0) {
+                    updateStatus('Aggiungi almeno un punto prima di tracciare il profilo!');
+                    return;
+                }
+                
+                isTracingProfile = !isTracingProfile;
+                const btn = document.getElementById('traceProfileBtn');
+                
+                if (isTracingProfile) {
+                    btn.classList.add('active');
+                    canRotate = false;
+                    updateStatus('Clicca e trascina per tracciare una linea di profilo!');
+                    if (profileLine) {
+                        scene.remove(profileLine);
+                        profileLine = null;
+                    }
+                    if (profilePlane) {
+                        scene.remove(profilePlane);
+                        profilePlane = null;
+                    }
+                    clearSection();
+                } else {
+                    btn.classList.remove('active');
+                    canRotate = true;
+                    updateStatus('Modalità traccia profilo disattivata');
+                }
+            });
+
+            // Vedi Mappa
+            document.getElementById('mapViewBtn').addEventListener('click', () => {
+                isMapView = !isMapView;
+                const btn = document.getElementById('mapViewBtn');
+                
+                if (isMapView) {
+                    // ATTIVA vista mappa (dall'alto)
+                    btn.classList.add('active');
+                    
+                    // Salva posizione corrente
+                    savedCameraPosition.copy(camera.position);
+                    
+                    // Posiziona camera direttamente sopra (vista pianta)
+                    camera.position.set(0, 600, 0);
+                    camera.lookAt(0, 0, 0);
+                    
+                    canRotate = false;
+                    updateStatus('Vista Mappa attiva! Clicca di nuovo per tornare alla vista 3D');
+                } else {
+                    // DISATTIVA vista mappa (torna alla vista 3D)
+                    btn.classList.remove('active');
+                    
+                    // Ripristina posizione precedente
+                    camera.position.copy(savedCameraPosition);
+                    camera.lookAt(0, 0, 0);
+                    
+                    canRotate = true;
+                    updateStatus('Vista 3D ripristinata');
+                }
+                
+                updateCompass();
+            });
+
+            // Reset
+            document.getElementById('resetBtn').addEventListener('click', reset);
+
+            // Mouse events
+            canvas.addEventListener('mousedown', onMouseDown);
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('mouseup', onMouseUp);
+        }
+
+        function onMouseDown(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const container = document.getElementById('canvasContainer');
+
+            if (isAddingPoint) {
+                const intersects = raycaster.intersectObject(terrainMesh);
+                if (intersects.length > 0) {
+                    const point = intersects[0].point;
+                    addUserPoint(point.x, point.z, 0);
+                    isAddingPoint = false;
+                    isEditingPoint = true;
+                    document.getElementById('addPointBtn').classList.remove('active');
+                    document.getElementById('confirmPointBtn').style.display = 'inline-block';
+                    container.classList.add('grab-cursor');
+                    updateStatus('Trascina il punto SU o GIÙ per modificare l\'altezza, poi clicca "Conferma Punto"');
+                }
+            } else if (isTracingProfile) {
+                // Permetti di iniziare anche fuori dal piano - proietta su piano orizzontale
+                const planeY = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const startPoint = new THREE.Vector3();
+                raycaster.ray.intersectPlane(planeY, startPoint);
+                
+                if (startPoint) {
+                    profileStartPoint = startPoint.clone();
+                    isDragging = true;
+                }
+            } else if (!isEditingPoint) {
+                const pointMeshes = userPoints.map(p => p.mesh);
+                const intersects = raycaster.intersectObjects(pointMeshes);
+                if (intersects.length > 0) {
+                    selectedPoint = userPoints.find(p => p.mesh === intersects[0].object);
+                    isDragging = true;
+                    isEditingPoint = true;
+                    canRotate = false;
+                    document.getElementById('confirmPointBtn').style.display = 'inline-block';
+                    container.classList.add('grab-cursor');
+                    updateStatus('Trascina il punto SU o GIÙ, poi clicca "Conferma Punto"');
+                }
+            } else if (isEditingPoint && selectedPoint) {
+                isDragging = true;
+                container.classList.add('grabbing-cursor');
+            }
+        }
+
+        function onMouseMove(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            if (isDragging && selectedPoint) {
+                const verticalOffset = mouse.y * 200;
+                const newY = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, verticalOffset));
+                
+                selectedPoint.y = newY;
+                selectedPoint.mesh.position.y = newY;
+                
+                updateTerrain();
+            } else if (isDragging && isTracingProfile && profileStartPoint) {
+                raycaster.setFromCamera(mouse, camera);
+                // Permetti di tracciare anche fuori dal piano - proietta su piano orizzontale
+                const planeY = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const currentPoint = new THREE.Vector3();
+                raycaster.ray.intersectPlane(planeY, currentPoint);
+                
+                if (currentPoint) {
+                    drawProfileLine(profileStartPoint, currentPoint);
+                }
+            }
+        }
+
+        function onMouseUp(event) {
+            const container = document.getElementById('canvasContainer');
+            
+            if (isDragging && isTracingProfile && profileStartPoint) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Permetti di finire anche fuori dal piano - proietta su piano orizzontale
+                const planeY = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const endPoint = new THREE.Vector3();
+                raycaster.ray.intersectPlane(planeY, endPoint);
+                
+                if (endPoint) {
+                    // Trimma la linea ai bordi del terreno
+                    const trimmedPoints = trimLineToTerrain(profileStartPoint, endPoint);
+                    
+                    if (trimmedPoints) {
+                        drawProfileLine(trimmedPoints.start, trimmedPoints.end);
+                        createProfilePlane(trimmedPoints.start, trimmedPoints.end);
+                        generateSection(trimmedPoints.start, trimmedPoints.end);
+                        
+                        isTracingProfile = false;
+                        canRotate = true;
+                        document.getElementById('traceProfileBtn').classList.remove('active');
+                        updateStatus('Profilo tracciato! Guarda la sezione sotto 👇');
+                    }
+                }
+                profileStartPoint = null;
+            }
+
+            if (isDragging && isEditingPoint) {
+                container.classList.remove('grabbing-cursor');
+            }
+
+            isDragging = false;
+        }
+
+        function addUserPoint(x, z, y) {
+            if (userPoints.length >= MAX_POINTS) return;
+
+            const geometry = new THREE.SphereGeometry(8, 16, 16);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: 0xff00ff,
+                emissive: 0xff00ff,
+                emissiveIntensity: 0.5
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+
+            const point = { x, z, y, mesh };
+            userPoints.push(point);
+            selectedPoint = point;
+            updatePointCounter();
+            updateTerrain();
+        }
+
+        function updateTerrain() {
+            if (userPoints.length === 0) return;
+
+            const positions = terrainMesh.geometry.attributes.position;
+            const vertex = new THREE.Vector3();
+
+            for (let i = 0; i < positions.count; i++) {
+                vertex.fromBufferAttribute(positions, i);
+                const worldPos = vertex.clone();
+                
+                let totalWeight = 0;
+                let weightedHeight = 0;
+
+                userPoints.forEach(point => {
+                    const dx = worldPos.x - point.x;
+                    const dz = worldPos.z - point.z;
+                    const distance = Math.sqrt(dx * dx + dz * dz);
+                    
+                    const weight = distance === 0 ? 1 : Math.exp(-distance / 100);
+                    totalWeight += weight;
+                    weightedHeight += weight * point.y;
+                });
+
+                const interpolatedHeight = totalWeight > 0 ? weightedHeight / totalWeight : 0;
+                positions.setY(i, interpolatedHeight);
+            }
+
+            positions.needsUpdate = true;
+            terrainMesh.geometry.computeVertexNormals();
+
+            generateContours();
+        }
+
+        function generateContours() {
+            contourLines.forEach(line => scene.remove(line));
+            contourLabels.forEach(label => scene.remove(label));
+            contourLines = [];
+            contourLabels = [];
+
+            if (userPoints.length === 0) return;
+
+            // LIVELLI CORRETTI: ±25, ±50, ±75, ±100, ±125, ±150, ±175, ±200 + 0
+            const levels = [
+                -200, -175, -150, -125, -100, -75, -50, -25,
+                0,
+                25, 50, 75, 100, 125, 150, 175, 200
+            ];
+
+            levels.forEach(level => {
+                const segments = extractContour(level);
+                
+                if (segments.length === 0) return;
+
+                // Determina colore e spessore
+                let color, linewidth;
+                
+                if (level === 0) {
+                    color = 0xFFFFFF; // Bianco per lo 0 (livello del mare)
+                    linewidth = 4;
+                } else {
+                    const absLevel = Math.abs(level);
+                    
+                    if (absLevel % 100 === 0) {
+                        color = 0x2196F3; // Blu per 100, 200
+                        linewidth = 4;
+                    } else if (absLevel % 50 === 0) {
+                        color = 0xf44336; // Rosso per 50, 150
+                        linewidth = 3;
+                    } else {
+                        color = 0xffeb3b; // Giallo per 25, 75, 125, 175
+                        linewidth = 2;
+                    }
+                }
+
+                segments.forEach(segment => {
+                    const geometry = new THREE.BufferGeometry().setFromPoints(segment);
+                    const material = new THREE.LineBasicMaterial({ 
+                        color: color,
+                        linewidth: linewidth
+                    });
+                    const line = new THREE.Line(geometry, material);
+                    scene.add(line);
+                    contourLines.push(line);
+                });
+
+                if (segments.length > 0 && segments[0].length > 0) {
+                    const labelPos = segments[0][Math.floor(segments[0].length / 2)];
+                    addContourLabel(labelPos, level, color);
+                }
+            });
+        }
+
+        function extractContour(level) {
+            const positions = terrainMesh.geometry.attributes.position;
+            const segments = [];
+            const visited = new Set();
+
+            const gridSize = Math.sqrt(positions.count);
+            
+            for (let i = 0; i < gridSize - 1; i++) {
+                for (let j = 0; j < gridSize - 1; j++) {
+                    const idx = i * gridSize + j;
+                    
+                    if (visited.has(idx)) continue;
+
+                    const v1 = new THREE.Vector3().fromBufferAttribute(positions, idx);
+                    const v2 = new THREE.Vector3().fromBufferAttribute(positions, idx + 1);
+                    const v3 = new THREE.Vector3().fromBufferAttribute(positions, idx + gridSize);
+                    const v4 = new THREE.Vector3().fromBufferAttribute(positions, idx + gridSize + 1);
+
+                    const heights = [v1.y, v2.y, v3.y, v4.y];
+                    const minH = Math.min(...heights);
+                    const maxH = Math.max(...heights);
+
+                    if (level >= minH && level <= maxH) {
+                        const points = [];
+                        
+                        if ((v1.y - level) * (v2.y - level) < 0) {
+                            const t = (level - v1.y) / (v2.y - v1.y);
+                            points.push(new THREE.Vector3(
+                                v1.x + t * (v2.x - v1.x),
+                                level,
+                                v1.z + t * (v2.z - v1.z)
+                            ));
+                        }
+                        if ((v2.y - level) * (v4.y - level) < 0) {
+                            const t = (level - v2.y) / (v4.y - v2.y);
+                            points.push(new THREE.Vector3(
+                                v2.x + t * (v4.x - v2.x),
+                                level,
+                                v2.z + t * (v4.z - v2.z)
+                            ));
+                        }
+                        if ((v4.y - level) * (v3.y - level) < 0) {
+                            const t = (level - v4.y) / (v3.y - v4.y);
+                            points.push(new THREE.Vector3(
+                                v4.x + t * (v3.x - v4.x),
+                                level,
+                                v4.z + t * (v3.z - v4.z)
+                            ));
+                        }
+                        if ((v3.y - level) * (v1.y - level) < 0) {
+                            const t = (level - v3.y) / (v1.y - v3.y);
+                            points.push(new THREE.Vector3(
+                                v3.x + t * (v1.x - v3.x),
+                                level,
+                                v3.z + t * (v1.z - v3.z)
+                            ));
+                        }
+
+                        if (points.length >= 2) {
+                            segments.push(points);
+                            visited.add(idx);
+                        }
+                    }
+                }
+            }
+
+            return segments;
+        }
+
+        function addContourLabel(position, value, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 64;
+            const context = canvas.getContext('2d');
+            
+            context.fillStyle = 'rgba(0,0,0,0.7)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            context.font = 'bold 32px Arial';
+            context.fillStyle = '#' + color.toString(16).padStart(6, '0');
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(value + 'm', canvas.width / 2, canvas.height / 2);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.position.copy(position);
+            sprite.position.y += 10;
+            sprite.scale.set(30, 15, 1);
+            
+            scene.add(sprite);
+            contourLabels.push(sprite);
+        }
+
+        function drawProfileLine(start, end) {
+            if (profileLine) {
+                scene.remove(profileLine);
+            }
+
+            const points = [
+                new THREE.Vector3(start.x, start.y, start.z),
+                new THREE.Vector3(end.x, end.y, end.z)
+            ];
+
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ 
+                color: 0xff0000,
+                linewidth: 4
+            });
+            profileLine = new THREE.Line(geometry, material);
+            scene.add(profileLine);
+        }
+
+        // Funzione per trimmare la linea ai bordi del terreno
+        function trimLineToTerrain(start, end) {
+            const halfSize = TERRAIN_SIZE / 2;
+            const bounds = {
+                minX: -halfSize,
+                maxX: halfSize,
+                minZ: -halfSize,
+                maxZ: halfSize
+            };
+
+            let p1 = start.clone();
+            let p2 = end.clone();
+
+            const direction = new THREE.Vector3().subVectors(p2, p1);
+            const length = direction.length();
+            
+            if (length === 0) return null;
+            
+            direction.normalize();
+
+            // Funzione per controllare se un punto è dentro i bordi
+            const isInside = (point) => {
+                return point.x >= bounds.minX && point.x <= bounds.maxX &&
+                       point.z >= bounds.minZ && point.z <= bounds.maxZ;
+            };
+
+            // Trova tutte le intersezioni con i bordi
+            const intersections = [];
+            
+            // Calcola parametro t per ogni bordo
+            const tValues = [];
+            
+            // Bordo sinistro (x = minX)
+            if (direction.x !== 0) {
+                const t = (bounds.minX - p1.x) / (direction.x * length);
+                if (t >= 0 && t <= 1) {
+                    const point = p1.clone().add(direction.clone().multiplyScalar(t * length));
+                    if (point.z >= bounds.minZ && point.z <= bounds.maxZ) {
+                        tValues.push({ t, point });
+                    }
+                }
+            }
+            
+            // Bordo destro (x = maxX)
+            if (direction.x !== 0) {
+                const t = (bounds.maxX - p1.x) / (direction.x * length);
+                if (t >= 0 && t <= 1) {
+                    const point = p1.clone().add(direction.clone().multiplyScalar(t * length));
+                    if (point.z >= bounds.minZ && point.z <= bounds.maxZ) {
+                        tValues.push({ t, point });
+                    }
+                }
+            }
+            
+            // Bordo superiore (z = minZ)
+            if (direction.z !== 0) {
+                const t = (bounds.minZ - p1.z) / (direction.z * length);
+                if (t >= 0 && t <= 1) {
+                    const point = p1.clone().add(direction.clone().multiplyScalar(t * length));
+                    if (point.x >= bounds.minX && point.x <= bounds.maxX) {
+                        tValues.push({ t, point });
+                    }
+                }
+            }
+            
+            // Bordo inferiore (z = maxZ)
+            if (direction.z !== 0) {
+                const t = (bounds.maxZ - p1.z) / (direction.z * length);
+                if (t >= 0 && t <= 1) {
+                    const point = p1.clone().add(direction.clone().multiplyScalar(t * length));
+                    if (point.x >= bounds.minX && point.x <= bounds.maxX) {
+                        tValues.push({ t, point });
+                    }
+                }
+            }
+
+            // Ordina le intersezioni per parametro t
+            tValues.sort((a, b) => a.t - b.t);
+
+            // Determina i punti finali
+            let finalStart = isInside(p1) ? p1 : null;
+            let finalEnd = isInside(p2) ? p2 : null;
+
+            // Se il punto iniziale è fuori, usa la prima intersezione
+            if (!finalStart && tValues.length > 0) {
+                finalStart = tValues[0].point;
+            }
+
+            // Se il punto finale è fuori, usa l'ultima intersezione
+            if (!finalEnd && tValues.length > 0) {
+                finalEnd = tValues[tValues.length - 1].point;
+            }
+
+            // Se entrambi sono fuori ma la linea attraversa il terreno
+            if (!isInside(p1) && !isInside(p2) && tValues.length >= 2) {
+                finalStart = tValues[0].point;
+                finalEnd = tValues[1].point;
+            }
+
+            if (!finalStart || !finalEnd) return null;
+
+            return { start: finalStart, end: finalEnd };
+        }
+
+        function createProfilePlane(start, end) {
+            if (profilePlane) {
+                scene.remove(profilePlane);
+            }
+
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const length = direction.length();
+            const height = 500;
+
+            const geometry = new THREE.PlaneGeometry(length, height);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xff0000,
+                transparent: true,
+                opacity: 0.4,
+                side: THREE.DoubleSide
+            });
+
+            profilePlane = new THREE.Mesh(geometry, material);
+            
+            const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            profilePlane.position.copy(center);
+            profilePlane.position.y = 0;
+
+            const angle = Math.atan2(direction.z, direction.x);
+            profilePlane.rotation.y = -angle;
+
+            scene.add(profilePlane);
+        }
+
+        function setupSectionCanvas() {
+            // Le dimensioni sono ora fisse in generateSection
+            // Questa funzione resta per compatibilità ma non fa più nulla
+        }
+
+        function generateSection(start, end) {
+            const canvas = document.getElementById('section-canvas');
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+            
+            const placeholder = document.getElementById('sectionPlaceholder');
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+            canvas.style.display = 'block';
+
+            // DIMENSIONI FISSE per contenere sempre TUTTO
+            // Range fisso: da -200m a +200m = 400m totali
+            const FULL_RANGE = 400;
+            const EXAGGERATION = 1.0;
+            const VISUAL_RANGE = FULL_RANGE * EXAGGERATION; // 400m "visivi" (scala reale)
+            
+            // Diagonale massima terreno: √(400² + 400²) ≈ 565.7m
+            const MAX_DIAGONAL = Math.sqrt(TERRAIN_SIZE * TERRAIN_SIZE * 2);
+            
+            // Dimensioni canvas FISSE
+            const CANVAS_HEIGHT = 330; // Isoipse più compatte con margini ridotti
+            const CANVAS_WIDTH = 1200; // Per contenere la diagonale massima
+            const MARGIN_TOP = 15;
+            const MARGIN_BOTTOM = 15;
+            const AVAILABLE_HEIGHT = CANVAS_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM;
+            
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT;
+
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const distance = direction.length();
+            const numSamples = 200;
+
+            const heights = [];
+            const positions = terrainMesh.geometry.attributes.position;
+
+            for (let i = 0; i <= numSamples; i++) {
+                const t = i / numSamples;
+                const samplePoint = new THREE.Vector3().lerpVectors(start, end, t);
+                
+                let closestHeight = 0;
+                let minDist = Infinity;
+
+                for (let j = 0; j < positions.count; j++) {
+                    const vertex = new THREE.Vector3().fromBufferAttribute(positions, j);
+                    const dx = vertex.x - samplePoint.x;
+                    const dz = vertex.z - samplePoint.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestHeight = vertex.y;
+                    }
+                }
+
+                heights.push(closestHeight);
+            }
+
+            // Range FISSO sempre da -200 a +200
+            const minHeight = -200;
+            const maxHeight = 200;
+
+            // Isoipse orizzontali - FULL RANGE SEMPRE VISIBILE + lo 0
+            const levels = [
+                -200, -175, -150, -125, -100, -75, -50, -25,
+                0,
+                25, 50, 75, 100, 125, 150, 175, 200
+            ];
+
+            levels.forEach(h => {
+                // ISOIPSE SENZA ESAGERAZIONE - scala reale
+                // Lo spazio disponibile è per 600m esagerati, ma le isoipse sono su scala reale di 400m
+                const realOffset = h - minHeight; // offset dalla base in metri reali
+                const y = CANVAS_HEIGHT - MARGIN_BOTTOM - (realOffset / (FULL_RANGE * EXAGGERATION)) * AVAILABLE_HEIGHT;
+
+                // Stili speciali per livelli diversi
+                if (h === 0) {
+                    // Lo 0 è il riferimento principale - linea bianca più grossa
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 3;
+                } else {
+                    const absH = Math.abs(h);
+                    if (absH % 100 === 0) {
+                        ctx.strokeStyle = '#2196F3';
+                        ctx.lineWidth = 3;
+                    } else if (absH % 50 === 0) {
+                        ctx.strokeStyle = '#f44336';
+                        ctx.lineWidth = 2;
+                    } else {
+                        ctx.strokeStyle = '#ffeb3b';
+                        ctx.lineWidth = 1.5;
+                    }
+                }
+
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+
+                ctx.fillStyle = ctx.strokeStyle;
+                ctx.font = 'bold 12px Arial';
+                ctx.fillText(h + 'm', 5, y - 5);
+            });
+
+            // Profilo del terreno - VERDE BRILLANTE E GROSSO
+            ctx.strokeStyle = '#00ff41';
+            ctx.lineWidth = 6;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+
+            for (let i = 0; i <= numSamples; i++) {
+                // X proporzionale alla distanza effettiva rispetto alla diagonale massima
+                const x = (i / numSamples) * (distance / MAX_DIAGONAL) * canvas.width;
+                
+                // TERRENO CON ESAGERAZIONE 1.5x
+                const realOffset = heights[i] - minHeight; // offset dalla base in metri reali
+                const y = CANVAS_HEIGHT - MARGIN_BOTTOM - (realOffset / FULL_RANGE) * AVAILABLE_HEIGHT;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+
+            // Riempi sotto il profilo
+            const lastX = (distance / MAX_DIAGONAL) * canvas.width;
+            ctx.lineTo(lastX, canvas.height);
+            ctx.lineTo(0, canvas.height);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.25)';
+            ctx.fill();
+
+            // Punti utente
+            userPoints.forEach(point => {
+                const pointVec = new THREE.Vector3(point.x, point.y, point.z);
+                const lineVec = new THREE.Vector3().subVectors(end, start);
+                const startToPoint = new THREE.Vector3().subVectors(pointVec, start);
+                
+                const projection = startToPoint.dot(lineVec.normalize());
+                
+                if (projection >= 0 && projection <= distance) {
+                    const projectedPoint = start.clone().add(lineVec.multiplyScalar(projection));
+                    const distanceFromLine = pointVec.distanceTo(projectedPoint);
+                    
+                    if (distanceFromLine < 20) {
+                        const x = (projection / MAX_DIAGONAL) * canvas.width;
+                        // Punti utente SENZA ESAGERAZIONE (come le isoipse)
+                        const realOffset = point.y - minHeight;
+                        const y = CANVAS_HEIGHT - MARGIN_BOTTOM - (realOffset / (FULL_RANGE * EXAGGERATION)) * AVAILABLE_HEIGHT;
+
+                        ctx.fillStyle = '#ff00ff';
+                        ctx.beginPath();
+                        ctx.arc(x, y, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = 'white';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                }
+            });
+        }
+
+        function clearSection() {
+            const canvas = document.getElementById('section-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            canvas.style.display = 'none';
+            
+            const placeholder = document.getElementById('sectionPlaceholder');
+            if (placeholder) {
+                placeholder.style.display = 'flex';
+            }
+        }
+
+        function updatePointCounter() {
+            document.getElementById('pointCounter').textContent = `Punti: ${userPoints.length}/${MAX_POINTS}`;
+        }
+
+        function updateStatus(message) {
+            document.getElementById('statusMessage').textContent = message;
+        }
+
+        function reset() {
+            userPoints.forEach(point => scene.remove(point.mesh));
+            userPoints = [];
+
+            contourLines.forEach(line => scene.remove(line));
+            contourLabels.forEach(label => scene.remove(label));
+            contourLines = [];
+            contourLabels = [];
+
+            if (profileLine) {
+                scene.remove(profileLine);
+                profileLine = null;
+            }
+            if (profilePlane) {
+                scene.remove(profilePlane);
+                profilePlane = null;
+            }
+
+            clearSection();
+
+            createTerrain();
+
+            isAddingPoint = false;
+            isEditingPoint = false;
+            isTracingProfile = false;
+            selectedPoint = null;
+            canRotate = true;
+            
+            // Ripristina vista mappa se attiva
+            if (isMapView) {
+                isMapView = false;
+                document.getElementById('mapViewBtn').classList.remove('active');
+                camera.position.set(300, 300, 300);
+                camera.lookAt(0, 0, 0);
+                updateCompass();
+            }
+            
+            document.getElementById('addPointBtn').classList.remove('active');
+            document.getElementById('traceProfileBtn').classList.remove('active');
+            document.getElementById('confirmPointBtn').style.display = 'none';
+            document.getElementById('canvasContainer').classList.remove('grab-cursor', 'grabbing-cursor');
+
+            updatePointCounter();
+            updateStatus('Tutto resettato! Clicca "Aggiungi Punto" per ricominciare!');
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvasContainer');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
